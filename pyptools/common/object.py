@@ -380,7 +380,7 @@ class TradingSessionDataSet:
             else:
                 _nearest_ts = [_ts for _ts in _product_ts_list if _ts.Date <= checking_date]
                 if _nearest_ts:
-                    return max(_nearest_ts, key=lambda x: x.Date).TradingSession
+                    return max(_nearest_ts, key=lambda x: x.date).TradingSession
                 else:
-                    return min(_product_ts_list, key=lambda x: x.Date).TradingSession
+                    return min(_product_ts_list, key=lambda x: x.date).TradingSession
 

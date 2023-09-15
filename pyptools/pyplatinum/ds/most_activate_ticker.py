@@ -54,7 +54,7 @@ class MostActivateTickerManager:
     def get_a_most_activate_ticker(self, product: Product, tdate: date = datetime.now().date()) -> Ticker or None:
         """获取某个Product在某天时的最活跃合约"""
         _product_mai: List[MostActivateTickerInfo] = self._data.get(product)
-        _the_info = max([_ for _ in _product_mai if _.Date <= tdate], key=lambda x: x.Date)
+        _the_info = max([_ for _ in _product_mai if _.Date <= tdate], key=lambda x: x.date)
         if _the_info:
             return _the_info.Ticker
         else:
@@ -65,5 +65,5 @@ class MostActivateTickerManager:
         _d_most_act_infos = {}
         for _product, _l_most_act_infos in self._data.items():
             _d_most_act_infos[_product] = max(
-                [_ for _ in _l_most_act_infos if _.Date <= tdate], key=lambda x: x.Date).Ticker
+                [_ for _ in _l_most_act_infos if _.Date <= tdate], key=lambda x: x.date).Ticker
         return _d_most_act_infos

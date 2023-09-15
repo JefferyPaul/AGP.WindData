@@ -13,6 +13,7 @@ from agpwind.object import WindGeneralTickerInfoData, WindDailyBarData
 
 def _parse_transaction_fee(s) -> (float, float):
     """
+    识别佣金规则，返回 (commission_on_rate, commission_per_share)
     wind trasactionfee eg:
         1元/手
         0.01%
@@ -47,7 +48,7 @@ def _parse_transaction_fee(s) -> (float, float):
             raise ValueError
         else:
             return commission_on_rate, commission_per_share
-    print(f'_convert_transaction_fee() 无法识别, {s}')
+    print(f'_parse_transaction_fee() 无法识别, {s}')
     raise ValueError
 
 
@@ -55,12 +56,13 @@ def start_wind():
     w.start()
 
 
-def end_wind():
-    w.end()
+def close_wind():
+    w.close()
 
 
-INNER_WIND_MAPPING_EXCHANGE_NAME = [
+# 用于转换 exchange名字 的对应表
 # ['Inner', 'Wind']
+INNER_WIND_MAPPING_EXCHANGE_NAME = [
     ["SHFE", "SHF"],
     ["DCE", "DCE"],
     ["CZCE", "CZC"],
@@ -68,13 +70,14 @@ INNER_WIND_MAPPING_EXCHANGE_NAME = [
     ["CFFEX", "CFE"]
 ]
 
-INNER_WIND_MAPPING_PRODUCT_NAME = [
+# 用于转换 symbol名字 的对应表
 # ['Inner', 'Wind']
+INNER_WIND_MAPPING_PRODUCT_NAME = [
     ["au2", "au"]
 ]
 
 
-def inner_symbol_to_wind(s: str) -> str:
+def _inner_symbol_to_wind(s: str) -> str:
     s_split = s.split(".")
 
     # 识别为 {name}.{exchange}
@@ -105,7 +108,7 @@ def inner_symbol_to_wind(s: str) -> str:
     return s
 
 
-def wind_symbol_name_to_inner(s: str) -> str:
+def _wind_symbol_name_to_inner(s: str) -> str:
     s_split = s.split(".")
 
     # 识别为 {name}.{exchange}
@@ -145,17 +148,12 @@ WindGeneralTickerInfo
 
 def get_wind_general_ticker_info(
         symbol: str,
-        start_date: datetime or date = None,
-        end_date: datetime or date = None,
+        start_date: datetime or date = datetime.now().date(),
+        end_date: datetime or date = datetime.now().date(),
 ) -> List[WindGeneralTickerInfoData]:
     """
     获取单个 期货合约或品种的 合约信息，
     """
-
-    if not end_date:
-        end_date: date = datetime.now().date()
-    if not start_date:
-        start_date: date = end_date - timedelta(days=10)
 
     # w.start()
     # w.wsd（codes, fields, beginTime, endTime, options）
@@ -163,7 +161,6 @@ def get_wind_general_ticker_info(
     all_data = list()
 
     # 获取
-    print(f'get_wind_general_ticker_info(), checking {symbol}, {str(start_date)}, {str(end_date)}')
     wsd_data = w.wsd(
         codes=symbol,
         fields=",".join([
@@ -196,7 +193,9 @@ def get_wind_general_ticker_info(
         print(f"Error Code: {wsd_data.ErrorCode}")
         print(f"Error Message: {wsd_data.Data[0][0]}")
         os.system('pause')
-    # pprint(wsd_data, indent=4)
+    # print('data:',)
+    # print(wsd_data)
+    # os.system('pause')
     # """
     """
     # usedf = True
@@ -211,27 +210,35 @@ def get_wind_general_ticker_info(
     for n in range(len(wsd_data.Times)):
         _date = wsd_data.Times[n]
         _ticker = wsd_data.Data[0][n]
-        _transaction_fee = str(wsd_data.Data[1][n])
-        _transaction_fee_float_today = str(wsd_data.Data[2][n])
+        _transaction_fee = wsd_data.Data[1][n]
+        _transaction_fee_float_today = wsd_data.Data[2][n]
         _margin = float(wsd_data.Data[3][n]) / 100
-        _price_unit = str(wsd_data.Data[4][n])
+        _price_unit = wsd_data.Data[4][n]           # 价格单位
         _min_move = float(str(wsd_data.Data[5][n]).strip(_price_unit))       # 5 人民币元/吨
         _point_value = float(wsd_data.Data[6][n])
 
         # 佣金识别
-        _commission_on_rate, _commission_per_share = _parse_transaction_fee(_transaction_fee)
-        _commission_on_rate_today, _commission_per_share_today = _parse_transaction_fee(_transaction_fee_float_today)
-        if _commission_on_rate != 0:
-            _flat_today_discount = _commission_on_rate_today / _commission_on_rate
+        if not _transaction_fee:
+            _commission_on_rate, _commission_per_share = ('', '')
         else:
-            if _commission_per_share == 0:
-                _flat_today_discount = 1
+            _commission_on_rate, _commission_per_share = _parse_transaction_fee(_transaction_fee)
+        if not _transaction_fee_float_today:
+            _commission_on_rate_today, _commission_per_share_today = ('', '')
+        else:
+            _commission_on_rate_today, _commission_per_share_today = _parse_transaction_fee(_transaction_fee_float_today)
+        if _commission_on_rate or _commission_per_share:
+            if _commission_on_rate != 0:
+                _flat_today_discount = _commission_on_rate_today / _commission_on_rate
             else:
-                _flat_today_discount = _commission_per_share_today / _commission_per_share
-
+                if _commission_per_share == 0:
+                    _flat_today_discount = 1
+                else:
+                    _flat_today_discount = _commission_per_share_today / _commission_per_share
+        else:
+            _flat_today_discount = ''
         _ = WindGeneralTickerInfoData(
-            product=wind_symbol_name_to_inner(symbol),
-            ticker=wind_symbol_name_to_inner(_ticker),
+            product=_wind_symbol_name_to_inner(symbol),
+            ticker=_wind_symbol_name_to_inner(_ticker),
             date=_date,
             point_value=_point_value,
             min_move=_min_move,
@@ -321,8 +328,8 @@ def get_wind_daily_bar(
         _open_interest_value = float(wsd_data.Data[8][n])
 
         _ = WindDailyBarData(
-            product=wind_symbol_name_to_inner(symbol),
-            ticker=wind_symbol_name_to_inner(_ticker),
+            product=_wind_symbol_name_to_inner(symbol),
+            ticker=_wind_symbol_name_to_inner(_ticker),
             date=_date,
             open=_o,
             high=_h,

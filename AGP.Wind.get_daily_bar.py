@@ -8,7 +8,7 @@ from typing import List
 PATH_ROOT = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(PATH_ROOT)
 
-from agpwind.method import get_wind_daily_bar, start_wind, end_wind, inner_symbol_to_wind
+from agpwind.method import get_wind_daily_bar, start_wind, close_wind, _inner_symbol_to_wind
 from agpwind.object import WindDailyBarData, WindDailyBarFile
 
 import argparse
@@ -60,10 +60,10 @@ if __name__ == '__main__':
     l_all_data: List[WindDailyBarData] = []
     for symbol in l_symbols:
         l_data: List[WindDailyBarData] = get_wind_daily_bar(
-            symbol=inner_symbol_to_wind(symbol), start_date=start_date, end_date=end_date)
+            symbol=_inner_symbol_to_wind(symbol), start_date=start_date, end_date=end_date)
         pprint(l_data, indent=4)
         l_all_data += l_data
-    end_wind()
+    close_wind()
 
     WindDailyBarFile.to_file(l_all_data, output_file)
     if output_file:

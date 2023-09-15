@@ -19,8 +19,53 @@ class WindGeneralTickerInfoData:
     flat_today_discount: float  # 平今佣金倍率。1：相同；0：不收钱；2：收2倍
     margin: float   # 保证金率
 
+    def __repr__(self):
+        return (f'<WindGeneralTickerInfoData(product={self.product}, '
+                f'date={str(self.date)}, ticker={self.ticker}, '
+                f'point_value={self.point_value}, min_move={self.min_move}, '
+                f'commission_on_rate={self.commission_on_rate}, commission_per_share={self.commission_per_share}, '
+                f'flat_today_discount={self.flat_today_discount}, margin={self.margin}')
+
     def __str__(self):
         return ','.join([str(_) for _ in self.__dict__.values()])
+
+    def __init__(
+            self,
+            product, ticker, date, point_value, min_move,
+            commission_on_rate, commission_per_share, flat_today_discount, margin,
+            **kwargs
+    ):
+        self.product = str(product)
+        self.ticker = str(ticker)
+        if type(date) is str:
+            if '-' in date:
+                self.date = datetime.strptime(date, "%Y-%m-%d").date()
+            elif '/' in date:
+                self.date = datetime.strptime(date, "%Y/%m/%d").date()
+            else:
+                self.date = datetime.strptime(date, "%Y%m%d").date()
+        else:
+            self.date = date
+        self.point_value = float(point_value)
+        self.min_move = float(min_move)
+        self.commission_on_rate = float(commission_on_rate)
+        self.commission_per_share = float(commission_per_share)
+        self.flat_today_discount = float(flat_today_discount)
+        self.margin = float(margin)
+
+    def check(self) -> bool:
+        _error_item = ['', None]
+        if (self.commission_per_share in _error_item) and (self.commission_on_rate in _error_item):
+            return False
+        if self.margin in _error_item:
+            return False
+        if self.point_value in _error_item:
+            return False
+        if self.flat_today_discount in _error_item:
+            return False
+        if self.min_move in _error_item:
+            return False
+        return True
 
 
 class WindGeneralTickerInfoFile:
@@ -77,6 +122,38 @@ class WindDailyBarData:
 
     def __str__(self):
         return ','.join([str(_) for _ in self.__dict__.values()])
+
+    def __repr__(self):
+        return (f'<WindDailyBarData(product={self.product}, '
+                f'date={str(self.date)}, ticker={self.ticker}, '
+                f'open={self.open}, high={self.high}, low={self.low}, close={self.close}, '
+                f'volume={self.volume}, traded_value={self.traded_value}, '
+                f'open_interest={self.open_interest}, open_interest_value={self.open_interest_value}')
+
+    def __init__(
+            self,
+            product, ticker, date, open, high, low, close, volume, traded_value, open_interest, open_interest_value,
+            **kwargs
+    ):
+        self.product = str(product)
+        self.ticker = str(ticker)
+        if type(date) is str:
+            if '-' in date:
+                self.date = datetime.strptime(date, "%Y-%m-%d").date()
+            elif '/' in date:
+                self.date = datetime.strptime(date, "%Y/%m/%d").date()
+            else:
+                self.date = datetime.strptime(date, "%Y%m%d").date()
+        else:
+            self.date = date
+        self.open = float(open)
+        self.high = float(high)
+        self.low = float(low)
+        self.close = float(close)
+        self.volume = float(volume)
+        self.traded_value = float(traded_value)
+        self.open_interest = float(open_interest)
+        self.open_interest_value = float(open_interest_value)
 
 
 class WindDailyBarFile:
