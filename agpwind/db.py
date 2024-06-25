@@ -1,12 +1,26 @@
 from urllib import parse
 from datetime import datetime, date
+import logging
+
+logger = logging.getLogger('apgwind')
 
 from .object import WindGeneralTickerInfoData
 
 from sqlalchemy import Column, String, Integer, Date, Float, ForeignKey, DateTime
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker, Session
+
+
+def creating_engine(host: str, user: str, pwd: str, database: str):
+    return create_engine(f'mssql+pymssql://{user}:{pwd}@{host}/{database}', echo=False)
+
+
+def creating_db_session(host: str, user: str, pwd: str, database: str) -> Session:
+    engine = creating_engine(host=host, user=user, pwd=pwd, database=database)
+    DBSession = sessionmaker(bind=engine)
+    session = DBSession()
+    return session
 
 
 Base = declarative_base()  # 创建对象的基类
@@ -72,4 +86,31 @@ class WindGeneralTickerInfo(Base):  # 定义一个类，继承Base
         return WindGeneralTickerInfoData(**self.to_dict())
 
 
+class WindNetValues(Base):
+    __tablename__ = 'WindNetValues'
+
+    Date = Column(String(128), primary_key=True)
+    Fund = Column(String(128), primary_key=True)
+    NetValue = Column(Float)            # 单位资产净值
+
+    def __init__(self, date, fund, net_value):
+        self.Date = date
+        self.Fund = fund
+        self.NetValue = net_value
+
+    def __repr__(self):
+        return (f'<WindNetValues(Date={self.Date}, '
+                f'Fund={str(self.Fund)}, NetValue={str(self.NetValue)}, ')
+
+    def __str__(self):
+        return ','.join(str(_) for _ in [
+            self.Date, self.Fund, self.NetValue,
+        ])
+
+    def to_dict(self):
+        return {
+            "Date": self.Date,
+            "Fund": self.Fund,
+            "NetValue": self.NetValue
+        }
 

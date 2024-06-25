@@ -12,8 +12,11 @@ sys.path.append(PATH_ROOT)
 from agpwind.method import get_wind_general_ticker_info, start_wind, close_wind, _inner_symbol_to_wind
 from agpwind.object import WindGeneralTickerInfoData, WindGeneralTickerInfoFile
 from agpwind.db import WindGeneralTickerInfo
-from pyptools.helper.simpleLogger import MyLogger
+from helper.mylogger import setup_logging
+import logging
 
+setup_logging()
+logger = logging.getLogger('APG.Wind.get_general_ticker_info')
 
 import argparse
 
@@ -54,6 +57,8 @@ def _to_wind_gti_db(db_config, data: List[WindGeneralTickerInfoData]):
     from sqlalchemy.orm import sessionmaker
     from urllib import parse
 
+    logger.info(f'wind gti data to db')
+
     engine = create_engine(
         f'mssql+pymssql://{str(db_config["user"])}:{parse.quote_plus(db_config["pwd"])}@'
         f'{str(db_config["host"])}/{str(db_config["db"])}',
@@ -76,7 +81,6 @@ def _to_wind_gti_db(db_config, data: List[WindGeneralTickerInfoData]):
 
 
 if __name__ == '__main__':
-    logger = MyLogger('GetWindGeneralTickerInfo', output_root=os.path.join(PATH_ROOT, 'logs'))
     logger.info('start')
 
     # 读取 输入文件

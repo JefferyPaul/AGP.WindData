@@ -1,14 +1,19 @@
 import os
 from datetime import datetime, date, timedelta
 from typing import List
+import logging
+from collections import defaultdict
+import math
+
+logger = logging.getLogger('apgwind')
 
 try:
     from WindPy import w
 except:
-    print('import WindPy error')
+    logger.error('import WindPy error')
     raise ImportError
 
-from agpwind.object import WindGeneralTickerInfoData, WindDailyBarData
+from agpwind.object import WindGeneralTickerInfoData, WindDailyBarData, WindMinuteBarData, WindMinuteBarFile
 
 
 def _parse_transaction_fee(s) -> (float, float):
@@ -48,7 +53,7 @@ def _parse_transaction_fee(s) -> (float, float):
             raise ValueError
         else:
             return commission_on_rate, commission_per_share
-    print(f'_parse_transaction_fee() 无法识别, {s}')
+    logger.error(f'_parse_transaction_fee() 无法识别, {s}')
     raise ValueError
 
 
@@ -67,7 +72,8 @@ INNER_WIND_MAPPING_EXCHANGE_NAME = [
     ["DCE", "DCE"],
     ["CZCE", "CZC"],
     ["INE", "INE"],
-    ["CFFEX", "CFE"]
+    ["CFFEX", "CFE"],
+    ["GFEX", "GFE"]
 ]
 
 # 用于转换 symbol名字 的对应表
@@ -190,12 +196,9 @@ def get_wind_general_ticker_info(
     if wsd_data.ErrorCode == 0:
         pass
     else:
-        print(f"Error Code: {wsd_data.ErrorCode}")
-        print(f"Error Message: {wsd_data.Data[0][0]}")
+        logger.error(f"Error Code: {wsd_data.ErrorCode}")
+        logger.error(f"Error Message: {wsd_data.Data[0][0]}")
         os.system('pause')
-    # print('data:',)
-    # print(wsd_data)
-    # os.system('pause')
     # """
     """
     # usedf = True
@@ -228,12 +231,12 @@ def get_wind_general_ticker_info(
             _commission_on_rate_today, _commission_per_share_today = _parse_transaction_fee(_transaction_fee_float_today)
         if _commission_on_rate or _commission_per_share:
             if _commission_on_rate != 0:
-                _flat_today_discount = _commission_on_rate_today / _commission_on_rate
+                _flat_today_discount = round(_commission_on_rate_today / _commission_on_rate, 4)
             else:
                 if _commission_per_share == 0:
                     _flat_today_discount = 1
                 else:
-                    _flat_today_discount = _commission_per_share_today / _commission_per_share
+                    _flat_today_discount = round(_commission_per_share_today / _commission_per_share, 4)
         else:
             _flat_today_discount = ''
         _ = WindGeneralTickerInfoData(
@@ -276,7 +279,7 @@ def get_wind_daily_bar(
     all_data = list()
 
     # 获取
-    print(f'get_wind_daily_bar(), checking {symbol}, {str(start_date)}, {str(end_date)}')
+    logger.info(f'get_wind_daily_bar(), checking {symbol}, {str(start_date)}, {str(end_date)}')
     wsd_data = w.wsd(
         codes=symbol,
         fields=",".join([
@@ -300,8 +303,8 @@ def get_wind_daily_bar(
     if wsd_data.ErrorCode == 0:
         pass
     else:
-        print(f"Error Code: {wsd_data.ErrorCode}")
-        print(f"Error Message: {wsd_data.Data[0][0]}")
+        logger.error(f"Error Code: {wsd_data.ErrorCode}")
+        logger.error(f"Error Message: {wsd_data.Data[0][0]}")
         os.system('pause')
     # pprint(wsd_data, indent=4)
     # """
@@ -316,32 +319,132 @@ def get_wind_daily_bar(
 
     # 数据格式转换
     for n in range(len(wsd_data.Times)):
-        _date = wsd_data.Times[n]
-        _ticker = wsd_data.Data[0][n]
-        _o = float(wsd_data.Data[1][n])
-        _h = float(wsd_data.Data[2][n])
-        _l = float(wsd_data.Data[3][n])
-        _c = float(wsd_data.Data[4][n])
-        _v = float(wsd_data.Data[5][n])
-        _traded_values = float(wsd_data.Data[6][n])
-        _open_interest = float(wsd_data.Data[7][n])
-        _open_interest_value = float(wsd_data.Data[8][n])
-
-        _ = WindDailyBarData(
-            product=_wind_symbol_name_to_inner(symbol),
-            ticker=_wind_symbol_name_to_inner(_ticker),
-            date=_date,
-            open=_o,
-            high=_h,
-            low=_l,
-            close=_c,
-            volume=_v,
-            traded_value=_traded_values,
-            open_interest=_open_interest,
-            open_interest_value=_open_interest_value
-        )
-        all_data.append(_)
+        try:
+            _date = wsd_data.Times[n]
+            _ticker = wsd_data.Data[0][n]
+            _o = float(wsd_data.Data[1][n])
+            _h = float(wsd_data.Data[2][n])
+            _l = float(wsd_data.Data[3][n])
+            _c = float(wsd_data.Data[4][n])
+            _v = float(wsd_data.Data[5][n])
+            _traded_values = float(wsd_data.Data[6][n])
+            _open_interest = float(wsd_data.Data[7][n])
+            _open_interest_value = float(wsd_data.Data[8][n])
+        except Exception as e:
+            logger.error('解析 wind_data 失败')
+            logger.error(e)
+            # logger.error(wsd_data.Data[1][n])
+        else:
+            _ = WindDailyBarData(
+                product=_wind_symbol_name_to_inner(symbol),
+                ticker=_wind_symbol_name_to_inner(_ticker),
+                date=_date,
+                open=_o,
+                high=_h,
+                low=_l,
+                close=_c,
+                volume=_v,
+                traded_value=_traded_values,
+                open_interest=_open_interest,
+                open_interest_value=_open_interest_value
+            )
+            all_data.append(_)
 
     return all_data
 
+
+def get_wind_minute_bar(
+        symbol: str,
+        start_date: datetime or date = None,
+        end_date: datetime or date = None,
+) -> List[WindMinuteBarData]:
+
+    if not end_date:
+        end_date: date = datetime.now().date()
+    if not start_date:
+        start_date: date = end_date - timedelta(days=10)
+
+    # w.start()
+    # w.wsd（codes, fields, beginTime, endTime, options）
+    # 可以支持取 多品种单指标 或者 单品种多指标 的时间序列数据
+    all_data = list()
+
+    # 获取
+    logger.info(f'get_wind_minute_bar(), checking {symbol}, {str(start_date)}, {str(end_date)}')
+
+    wsi_data = w.wsi(
+        codes=symbol,
+        fields=",".join([
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "oi",       # 持仓量
+        ]),
+        beginTime=start_date,
+        endTime=end_date,
+        Fill='',     # 默认为 "Blank"
+    )
+
+    # """
+    # usedf=False
+    if wsi_data.ErrorCode == 0:
+        pass
+    else:
+        logger.error(f"Error Code: {wsi_data.ErrorCode}")
+        logger.error(f"Error Message: {wsi_data.Data[0][0]}")
+        os.system('pause')
+
+    # 数据格式转换
+    for n in range(len(wsi_data.Times)):
+        try:
+            _data_time = wsi_data.Times[n] + timedelta(minutes=1)
+            _o = float(wsi_data.Data[0][n])
+            _h = float(wsi_data.Data[1][n])
+            _l = float(wsi_data.Data[2][n])
+            _c = float(wsi_data.Data[3][n])
+            _v = float(wsi_data.Data[4][n])
+            _open_interest = float(wsi_data.Data[5][n])
+        except Exception as e:
+            logger.error('解析 wind_data 失败')
+            logger.error(e)
+            # logger.error(wsd_data.Data[1][n])
+        else:
+            if True in [math.isnan(__) for __ in [_o, _h, _l, _c, _v]]:
+                continue
+            else:
+                _ = WindMinuteBarData(
+                    ticker=_wind_symbol_name_to_inner(symbol),
+                    datatime=_data_time,
+                    open=_o,
+                    high=_h,
+                    low=_l,
+                    close=_c,
+                    volume=_v,
+                    open_interest=_open_interest,
+                )
+                all_data.append(_)
+
+    return all_data
+
+
+def output_wind_minute_bar_data(data: List[WindMinuteBarData], output_root):
+    if not os.path.isdir(output_root):
+        os.makedirs(output_root)
+    l_data_group_by = defaultdict(list)
+    for _ in data:
+        l_data_group_by[(_.ticker, _.datatime.date().strftime('%Y%m%d'))].append(_)
+
+    for _gb_key, _data_list in l_data_group_by.items():
+        _ticker = _gb_key[0]
+        _ticker_inner = _wind_symbol_name_to_inner(_ticker)
+        _date = _gb_key[1]
+        logger.info(f'output_wind_minute_bar_data, {_ticker_inner}, {_date}')
+
+        _output_date_folder = os.path.join(output_root, _date)
+        if not os.path.isdir(_output_date_folder):
+            os.makedirs(_output_date_folder)
+        _output_file = os.path.join(_output_date_folder, _ticker + '.csv')
+        WindMinuteBarFile.to_file(data=_data_list, path=_output_file)
 
