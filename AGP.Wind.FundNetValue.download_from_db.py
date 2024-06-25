@@ -38,13 +38,13 @@ arg_parser.add_argument('-o', '--output', default=os.path.join(PATH_PROJECT, 'Ou
 arg_parser.add_argument('--start', default='20231001')
 args = arg_parser.parse_args()
 PATH_DB_INFO_FILE = os.path.abspath(args.dbinfo)
-PATH_OUTPUT = os.path.abspath(args.output)
+PATH_OUTPUT_ROOT = os.path.abspath(args.output)
 START_DATE = str(args.start)
 assert os.path.isfile(PATH_DB_INFO_FILE)
-if os.path.isdir(PATH_OUTPUT):
-    shutil.rmtree(PATH_OUTPUT)
+if os.path.isdir(PATH_OUTPUT_ROOT):
+    shutil.rmtree(PATH_OUTPUT_ROOT)
     sleep(0.1)
-os.makedirs(PATH_OUTPUT)
+os.makedirs(PATH_OUTPUT_ROOT)
 
 
 if __name__ == '__main__':
@@ -81,14 +81,11 @@ if __name__ == '__main__':
             "NetValue": _data[2],
         })
 
-    path_output_nv = os.path.join(PATH_OUTPUT, 'NetValuesInFund')
-    if not os.path.isdir(path_output_nv):
-        os.makedirs(path_output_nv)
     for _fund, _data in d_all_data_gb_fund.items():
         df = pd.DataFrame(_data)
         df.sort_values('Date', inplace=True)
         # output_1 净值
-        path_output_csv = os.path.join(path_output_nv, _fund + '.csv')
+        path_output_csv = os.path.join(PATH_OUTPUT_ROOT, _fund + '.csv')
         df.to_csv(path_output_csv, columns=['Date', 'NetValue'], index=False, header=False, encoding='utf-8')
 
     logger.info('Finished')
