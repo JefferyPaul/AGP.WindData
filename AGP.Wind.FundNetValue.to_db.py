@@ -1,7 +1,11 @@
 # encoding:utf-8
 
 """
-只插入新数据。重复的数据不会覆盖旧数据。
+插入新数据。
+
+查看新数据的最新日期，
+删除旧数据，
+插入新数据
 """
 
 # 内置库
@@ -60,6 +64,15 @@ def wind_nv_data_2_db(db_session: Session, date, fund, net_value):
         logger.info('插入新数据: %s' % str(nv_obj))
         pass
 
+
+def del_old_data_in_db(db_session: Session, start_date, fund):
+    db_session.query(WindNetValues).filter(
+        WindNetValues.Fund == fund,
+        WindNetValues.Date >= start_date,
+    ).delete()
+    db_session.commit()
+
+
 def main():
     # 【0】  读取config
     db_info: dict = json.loads(
@@ -89,6 +102,7 @@ def main():
 
         with open(p_file, encoding='utf-8') as f:
             l_lines = f.readlines()
+        d_new_data = dict()
         for line in l_lines:
             line = line.strip()
             if line == '':
@@ -96,16 +110,23 @@ def main():
             if line.find('Date') == 0:
                 continue
             _date = line.split(',')[0]
-            _net_value = line.split(',')[1]
+            _net_value = float(line.split(',')[1])
             if _date < start_date_to_input:
                 continue
-            else:
-                wind_nv_data_2_db(
-                    db_session=db_session,
-                    fund=_fund_name,
-                    date=_date,
-                    net_value=_net_value
-                )
+            d_new_data[_date] = _net_value
+
+        # 删除数据
+        _first_day = min(list(d_new_data.keys()))
+        del_old_data_in_db(db_session=db_session, start_date=_first_day, fund=_fund_name)
+
+        # 插入数据
+        for _date, _net_value in d_new_data.items():
+            wind_nv_data_2_db(
+                db_session=db_session,
+                fund=_fund_name,
+                date=_date,
+                net_value=_net_value
+            )
 
     # 关闭
     db_session.close()

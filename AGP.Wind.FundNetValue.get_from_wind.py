@@ -29,11 +29,13 @@ arg_parser.add_argument('-s', '--start', default='')
 arg_parser.add_argument('-e', '--end', default='')
 arg_parser.add_argument('-i', '--input', default='', help='输入文件')
 arg_parser.add_argument('-o', '--output', default='')
+arg_parser.add_argument('-p', '--period', default='W')
 args = arg_parser.parse_args()
 start_date = args.start
 end_date = args.end
 input_file = args.input
 output_root = args.output
+fetching_period = args.period
 
 if end_date:
     end_date = datetime.strptime(end_date, '%Y%m%d').date()
@@ -47,10 +49,13 @@ else:
 input_file = os.path.abspath(input_file)
 assert os.path.isfile(input_file)
 
-if os.path.isdir(output_root):
-    shutil.rmtree(output_root)
-    sleep(0.1)
-os.makedirs(output_root)
+# if os.path.isdir(output_root):
+#     shutil.rmtree(output_root)
+#     sleep(0.1)
+# os.makedirs(output_root)
+if not os.path.isdir(output_root):
+    os.makedirs(output_root)
+
 # path_output_nv_data = output_root
 # if not os.path.isdir(path_output_nv_data):
 #     os.makedirs(path_output_nv_data)
@@ -83,7 +88,7 @@ if __name__ == '__main__':
             _id, "NAV_adj",
             start_date,
             end_date,
-            "Period=W"
+            f"Period={fetching_period}"
         )
         if wsd_data.ErrorCode == 0:
             pass
